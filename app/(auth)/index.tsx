@@ -29,7 +29,6 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
-  const setCompanies = useAuthStore((state) => state.setCompanies);
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -68,7 +67,6 @@ export default function LoginScreen() {
       console.log("Logged in user:", user);
       if (user && user.appUserName) {
         setUser(user);
-        // setCompanies(user || []);
         router.replace('/(tabs)');
       } else {
         Alert.alert('Login Failed', 'Invalid credentials');

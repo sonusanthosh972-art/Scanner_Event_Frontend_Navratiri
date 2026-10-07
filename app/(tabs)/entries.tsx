@@ -15,7 +15,7 @@ import { useAuthStore } from "@/store/authStore";
 import { LogOut, Calendar, Clock, QrCode, Ticket, Layers } from "lucide-react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { InOutEntry } from "@/lib/types";
-import { apiService } from "@/services/api";
+import { localApi } from "@/services/localApi";
 import { formatDate, formatTime } from "@/lib/date";
 import { useRouter } from "expo-router";
 
@@ -46,7 +46,7 @@ export default function EntriesTab() {
     else setLoading(true);
 
     try {
-      const data = await apiService.getTodayEntries();
+      const data = await localApi.entries(String(user.eventId));
       setEntries(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch entries:", error);
@@ -180,13 +180,13 @@ export default function EntriesTab() {
             icon={<Ticket size={15} color={filter === "3" ? "#fff" : "#0042BF"} />}
             onPress={() => setFilter("3")}
           />
-          <FilterChip
+          {/* <FilterChip
             label="Date"
             active={false}
             disabled
             icon={<Calendar size={15} color="#A0A6B1" />}
             onPress={() => {}}
-          />
+          /> */}
         </ScrollView>
       </View>
 

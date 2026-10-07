@@ -14,26 +14,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
-import { apiService } from '@/services/api';
+import { localApi } from '@/services/localApi';
 import { LogOut, Check, X, ScanLine, Camera } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { GuestDetails } from '@/lib/types';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CAMERA_SIZE = SCREEN_WIDTH - 48;
 
-type ScanAction = 'ASK' | 'IN' | 'OUT';
-
 export default function ScanTab() {
-  const [guest, setGuest] = useState<GuestDetails | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [attendanceResult, setAttendanceResult] = useState<{
     success: boolean;
     message: string;
   } | null>(null);
-  const [defaultAction, setDefaultAction] = useState<ScanAction>('ASK');
   const [scanned, setScanned] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const user = useAuthStore((state) => state.user);
@@ -52,87 +47,13 @@ export default function ScanTab() {
 
     setLoading(true);
     try {
-      const guests = await apiService.getEmployeeByBarcode(qrValue);
-      console.log('guests::', guests);
-      if (Array.isArray(guests) && guests[0]) {
-        setGuest(guests[0]);
-        setAttendanceResult(null);
-
-        if (defaultAction === 'ASK') {
-          setShowDialog(true);
-        } else {
-          // Auto-process based on default action
-          await processAttendance(guests[0], defaultAction);
-        }
-      } else {
-        Alert.alert('Error', 'Visitor not found');
-        setScanned(false);
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to fetch guest data');
-      setScanned(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const processAttendance = async (guestData: GuestDetails, type: 'IN' | 'OUT') => {
-    if (!guestData || !user) return;
-
-    setLoading(true);
-    try {
-      const result = await apiService.createAttendanceEntry(
-        {
-          EventLogId: guestData.eventLogId,
-          QrName: guestData.qrName,
-          QrId: guestData.qrId != null ? String(guestData.qrId) : null,
-        },
-        type,
-      );
-
-      setAttendanceResult({
-        success: result?.value !== false,
-        message:
-          result?.message ||
-          `${guestData.fullName || guestData.qrName || 'Visitor'} marked as ${type} successfully`,
-      });
+      // Every entry goes through the laptop, which checks the QR and blocks duplicates across all phones
+      const result = await localApi.markEntry(String(user?.eventId ?? ''), { qrValue }, 'scan');
+      setAttendanceResult({ success: result.value === true, message: result.message });
       setShowDialog(true);
     } catch (error: any) {
-      setAttendanceResult({
-        success: false,
-        message: error.message || 'Failed to record attendance',
-      });
+      setAttendanceResult({ success: false, message: error.message });
       setShowDialog(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAttendance = async (type: 'IN' | 'OUT') => {
-    if (!guest || !user) return;
-
-    setLoading(true);
-    try {
-      const result = await apiService.createAttendanceEntry(
-        {
-          EventLogId: guest.eventLogId,
-          QrName: guest.qrName,
-          QrId: guest.qrId != null ? String(guest.qrId) : null,
-        },
-        type,
-      );
-
-      setAttendanceResult({
-        success: result?.value !== false,
-        message:
-          result?.message ||
-          `${guest.fullName || guest.qrName || 'Visitor'} marked as ${type} successfully`,
-      });
-    } catch (error: any) {
-      setAttendanceResult({
-        success: false,
-        message: error.message || 'Failed to record attendance',
-      });
     } finally {
       setLoading(false);
     }
@@ -140,7 +61,6 @@ export default function ScanTab() {
 
   const closeDialog = () => {
     setShowDialog(false);
-    setGuest(null);
     setAttendanceResult(null);
     setScanned(false);
   };
@@ -193,8 +113,8 @@ export default function ScanTab() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>AMS QR Scanner</Text>
-          <Text style={styles.headerSubtitle}>Scan Employee QR Code</Text>
+          <Text style={styles.headerTitle}>SI E-Pass Scanner</Text>
+          <Text style={styles.headerSubtitle}>E-Pass Scanner</Text>
         </View>
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
           <LogOut size={22} color="#0042BF" />
@@ -203,30 +123,6 @@ export default function ScanTab() {
 
       {/* Divider */}
       <View style={styles.divider} />
-
-      {/* Default Scan Action Toggle
-      <View style={styles.actionRow}>
-        <Text style={styles.actionLabel}>Default Scan Action</Text>
-        <View style={styles.actionToggleGroup}>
-          {(['ASK', 'IN', 'OUT'] as ScanAction[]).map((action) => (
-            <TouchableOpacity
-              key={action}
-              style={[
-                styles.actionToggle,
-                defaultAction === action && styles.actionToggleActive,
-              ]}
-              onPress={() => setDefaultAction(action)}>
-              <Text
-                style={[
-                  styles.actionToggleText,
-                  defaultAction === action && styles.actionToggleTextActive,
-                ]}>
-                {action}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View> */}
 
       {/* Camera Preview */}
       <View style={styles.cameraWrapper}>
@@ -296,7 +192,7 @@ export default function ScanTab() {
               </View>
             )}
 
-            {attendanceResult ? (
+            {attendanceResult && (
               <View style={styles.resultContainer}>
                 <View
                   style={[
@@ -313,38 +209,9 @@ export default function ScanTab() {
                 </View>
                 <Text style={styles.resultMessage}>{attendanceResult.message}</Text>
                 <TouchableOpacity style={styles.button} onPress={closeDialog}>
-                  <Text style={styles.buttonText}>Close</Text>
+                  <Text style={styles.buttonText}>OK</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <>
-                <Text style={styles.dialogTitle}>Guest Details</Text>
-
-                {guest && (
-                  <View style={styles.employeeDetails}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Name:</Text>
-                      <Text style={styles.detailText}>{guest.qrName}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>QR ID:</Text>
-                      <Text style={styles.detailText}>{guest.qrId}</Text>
-                    </View>
-                  </View>
-                )}
-
-                <View style={styles.buttonContainer}>
-                  <TouchableOpacity
-                    style={[styles.securityButton, styles.inButton]}
-                    onPress={() => handleAttendance('IN')}>
-                    <Text style={styles.buttonText}>IN</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.cancelButton} onPress={closeDialog}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </>
             )}
           </View>
         </View>

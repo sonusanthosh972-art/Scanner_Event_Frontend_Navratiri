@@ -33,3 +33,5 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+local-server/data.json
+local-server/data.json.tmp

@@ -5,6 +5,11 @@ export interface User {
   eventId: number;
 }
 
+export interface ApiMessage {
+  value: boolean;
+  message: string;
+}
+
 export interface InOutEntry {
   eventLogId: number;
   logDate: string;

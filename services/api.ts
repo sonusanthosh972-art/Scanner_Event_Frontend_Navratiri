@@ -1,9 +1,11 @@
-import { Employee, GuestDetails, InOutEntry, User } from '@/lib/types';
+import { ApiMessage, Employee, GuestDetails, InOutEntry, User } from '@/lib/types';
+import { captureDeviceIp } from '@/lib/deviceIp';
 import axios from 'axios';
 
 // const BASE_URL = "https://eventsgalaxy4u.com";
-const BASE_URL = 'https://events.scriptindia.in';
-const GUEST_LOOKUP_BASE_URL = 'https://epass.scriptindia.in';
+const BASE_URL = 'http://172.29.7.104:8008';
+const GUEST_LOOKUP_BASE_URL = 'http://172.29.7.104:8008';
+const QR_ENTRY_BASE_URL = 'http://172.29.7.104:8008';
 
 const api = axios.create({
   baseURL: GUEST_LOOKUP_BASE_URL,
@@ -32,6 +34,31 @@ export interface AttendanceEntry {
 }
 
 export const apiService = {
+  /** Marks entry for a scanned QR; returns the backend's { value, message } as-is */
+  async eventInTimeByQrName(
+    qrName: string,
+    eventId: string,
+    dateTime = formatIST().dateTime, // pass the original time when syncing offline entries
+  ): Promise<ApiMessage> {
+    const mobileName = await captureDeviceIp();
+    try {
+      const { data } = await axios.post(`${QR_ENTRY_BASE_URL}/EventInTimeByQrName`, {
+        QrName: qrName,
+        eventid: eventId,
+        DeviceIp: 'Insert using Mobile App',
+        MobileName: mobileName, // phone IP, captured at submit
+        LogDate: dateTime,
+        EntryDate: dateTime,
+        InFlag: '1',
+      });
+      return data;
+    } catch (error: any) {
+      const data = error?.response?.data;
+      if (data && typeof data.value === 'boolean') return data;
+      throw backendError(error);
+    }
+  },
+
   async login(AppUserName: string, AppPassword: string): Promise<User> {
     try {
       const response = await guestLookupApi.post('/AppUserAuthentication', {
@@ -67,19 +94,14 @@ export const apiService = {
     }
   },
 
-  async getEmployeeByBarcode(qrValue: string): Promise<GuestDetails[]> {
+  async getEmployeeByBarcode(qrValue: string): Promise<GuestDetails[] | ApiMessage> {
     try {
       const response = await guestLookupApi.get('/QrCodeGuestDetails', {
         params: { QRValue: qrValue },
       });
       return response.data;
     } catch (error: any) {
-      if (error.response) {
-        throw new Error(
-          error.response?.data?.error || 'Failed to fetch employee',
-        );
-      }
-      throw error;
+      throw backendError(error);
     }
   },
 
@@ -94,8 +116,8 @@ export const apiService = {
   },
 
   /** High-level helper that chooses endpoint and builds the right payload */
-  async createAttendanceEntry(employee: EmployeeLite, type: ScanType) {
-    const payload = buildPayload(employee);
+  async createAttendanceEntry(employee: EmployeeLite, type: ScanType, dateTime?: string) {
+    const payload = buildPayload(employee, await captureDeviceIp(), dateTime);
 
     console.log('Attendance Payload:', payload);
 
@@ -104,14 +126,7 @@ export const apiService = {
         ? await this.postIn(payload)
         : await this.postOut(payload);
     } catch (err: any) {
-      if (err?.response?.data) {
-        const serverMsg =
-          err.response.data.error ||
-          err.response.data.message ||
-          err.response.data.ErrorMessage;
-        if (serverMsg) throw new Error(serverMsg);
-      }
-      throw err;
+      throw backendError(err);
     }
   },
 
@@ -128,12 +143,28 @@ export const apiService = {
   },
 };
 
+function backendError(error: any) {
+  const data = error?.response?.data;
+  const err = new Error(data?.message || data?.error || data?.ErrorMessage || error?.message);
+  // No response at all → request never reached the backend (no internet / timeout)
+  (err as any).offline = !!error?.isAxiosError && !error.response;
+  return err;
+}
+
+/** True when an error from apiService means the backend couldn't be reached */
+export function isOfflineError(error: any) {
+  return !!error?.offline;
+}
+
+export { formatIST };
+
 type ScanType = 'IN' | 'OUT';
 
 interface EmployeeLite {
   EventLogId: string | number | null;
   QrId: string | null;
   QrName: string | null;
+  EventId: string | number | null;
 }
 
 function pad(n: number) {
@@ -159,15 +190,16 @@ function formatIST(date = new Date()) {
   };
 }
 
-function buildPayload(employee: EmployeeLite) {
-  const { dateTime, dateOnly } = formatIST();
+function buildPayload(employee: EmployeeLite, mobileName: string, dateTime = formatIST().dateTime) {
 
   return {
     DeviceIp: 'Insert using Mobile App',
+    MobileName: mobileName, // phone IP, captured when IN is pressed
     LogDate: dateTime, // "YYYY-MM-DD HH:mm:ss"
     QrName: employee.QrName,
     QrId: employee.QrId,
     EntryDate: dateTime, // "YYYY-MM-DD HH:mm:ss"
     InFlag: '1', // "1" = IN, "2" = OUT
+    eventid: employee.EventId != null ? String(employee.EventId) : null, // from login response
   };
 }
