@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
-import { localApi } from '@/services/localApi';
+import { entryApi } from '@/services/entryApi';
 import { LogOut, Check, X, ScanLine, Camera } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -47,8 +47,8 @@ export default function ScanTab() {
 
     setLoading(true);
     try {
-      // Every entry goes through the laptop, which checks the QR and blocks duplicates across all phones
-      const result = await localApi.markEntry(String(user?.eventId ?? ''), { qrValue }, 'scan');
+      // Sent straight to the selected backend (Live, or Offline Sync IP:8008)
+      const result = await entryApi.markEntry(String(user?.eventId ?? ''), { qrValue });
       setAttendanceResult({ success: result.value === true, message: result.message });
       setShowDialog(true);
     } catch (error: any) {

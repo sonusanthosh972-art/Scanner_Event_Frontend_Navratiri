@@ -2,24 +2,27 @@ import { ApiMessage, Employee, GuestDetails, InOutEntry, User } from '@/lib/type
 import { captureDeviceIp } from '@/lib/deviceIp';
 import axios from 'axios';
 
-// const BASE_URL = "https://eventsgalaxy4u.com";
-const BASE_URL = 'http://172.29.7.104:8008';
-const GUEST_LOOKUP_BASE_URL = 'http://172.29.7.104:8008';
-const QR_ENTRY_BASE_URL = 'http://172.29.7.104:8008';
+import { backendUrl } from '@/store/localServerStore';
+
+// Base URL is read on every request, so switching Live / Offline Sync or changing the IP applies at once
+const useBackend = (config: any) => {
+  config.baseURL = backendUrl();
+  return config;
+};
 
 const api = axios.create({
-  baseURL: GUEST_LOOKUP_BASE_URL,
-  headers: { 
-    'Content-Type': 'application/json',
-  },
-});
-
-const guestLookupApi = axios.create({
-  baseURL: GUEST_LOOKUP_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+api.interceptors.request.use(useBackend);
+
+const guestLookupApi = axios.create({
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+guestLookupApi.interceptors.request.use(useBackend);
 
 // types/employee.ts
 
@@ -42,7 +45,7 @@ export const apiService = {
   ): Promise<ApiMessage> {
     const mobileName = await captureDeviceIp();
     try {
-      const { data } = await axios.post(`${QR_ENTRY_BASE_URL}/EventInTimeByQrName`, {
+      const { data } = await axios.post(`${backendUrl()}/EventInTimeByQrName`, {
         QrName: qrName,
         eventid: eventId,
         DeviceIp: 'Insert using Mobile App',

@@ -17,7 +17,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { apiService } from '@/services/api';
-import { Eye, EyeOff, User, Lock } from 'lucide-react-native';
+import { Eye, EyeOff, User, Lock, Server } from 'lucide-react-native';
+import { LIVE_URL, ServerMode, useLocalServerStore } from '@/store/localServerStore';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -29,6 +30,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
+  const { mode, offlineIp, setMode, setOfflineIp } = useLocalServerStore();
+  const [ipDraft, setIpDraft] = useState(offlineIp);
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -59,6 +62,15 @@ export default function LoginScreen() {
     if (!username || !password) {
       Alert.alert('Error', 'Please enter username and password');
       return;
+    }
+    if (mode === 'offline') {
+      if (!ipDraft.trim()) {
+        Alert.alert('Error', 'Please enter the Offline Sync IP');
+        return;
+      }
+      // Saved, and used everywhere: login, scans and entries all go to http://IP:8008
+      setOfflineIp(ipDraft);
+      setIpDraft(useLocalServerStore.getState().offlineIp);
     }
 
     setLoading(true);
@@ -121,6 +133,42 @@ export default function LoginScreen() {
         <View style={styles.card}>
           <Text style={styles.welcomeText}>Welcome Back</Text>
           <Text style={styles.signInText}>Sign in to continue</Text>
+
+          {/* Server */}
+          <View style={styles.modeRow}>
+            {([
+              ['live', 'Live'],
+              ['offline', 'Offline Sync'],
+            ] as [ServerMode, string][]).map(([value, label]) => (
+              <TouchableOpacity
+                key={value}
+                style={[styles.modeOption, mode === value && styles.modeOptionActive]}
+                onPress={() => setMode(value)}
+                disabled={loading}
+                activeOpacity={0.85}>
+                <Text style={[styles.modeText, mode === value && styles.modeTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {mode === 'offline' ? (
+            <View style={styles.inputWrapper}>
+              <View style={styles.inputIconContainer}>
+                <Server size={18} color="#0042BF" />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Server IP, e.g. 192.168.0.50"
+                placeholderTextColor="#999"
+                value={ipDraft}
+                onChangeText={setIpDraft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="numbers-and-punctuation"
+              />
+            </View>
+          ) : (
+            <Text style={styles.modeHint}>{LIVE_URL}</Text>
+          )}
 
           {/* Username Field */}
           <View style={styles.inputWrapper}>
@@ -270,6 +318,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     marginBottom: 24,
+  },
+
+  /* Server mode */
+  modeRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F4FA',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 12,
+  },
+  modeOption: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeOptionActive: {
+    backgroundColor: '#0042BF',
+  },
+  modeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0042BF',
+  },
+  modeTextActive: {
+    color: '#fff',
+  },
+  modeHint: {
+    fontSize: 12,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 16,
   },
 
   /* Input */

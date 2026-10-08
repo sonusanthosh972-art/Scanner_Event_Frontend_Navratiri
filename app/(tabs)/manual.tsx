@@ -17,15 +17,15 @@ import { useRouter } from 'expo-router';
 import { LogOut, Check, X, User, CloudOff } from 'lucide-react-native';
 import { useAuthStore } from '@/store/authStore';
 import { isOfflineError } from '@/services/api';
-import { localApi } from '@/services/localApi';
+import { entryApi } from '@/services/entryApi';
 import { ApiMessage } from '@/lib/types';
 
-/** Manual entry tab: type a QR name; the laptop server marks it for the logged-in user's event */
+/** Manual entry tab: type a QR name; the backend marks it for the logged-in user's event */
 export default function ManualEntryTab() {
   const user = useAuthStore((state) => state.user);
   const [qrName, setQrName] = useState('');
   const [loading, setLoading] = useState(false);
-  // offline = the laptop server could not be reached
+  // offline = the backend could not be reached
   const [result, setResult] = useState<(ApiMessage & { offline?: boolean }) | null>(null);
   const logout = useAuthStore((state) => state.logout);
   const router = useRouter();
@@ -45,8 +45,8 @@ export default function ManualEntryTab() {
 
     setLoading(true);
     try {
-      // Every entry goes through the laptop, which blocks duplicates across all phones
-      setResult(await localApi.markEntry(eventId, { qrName: name }, 'manual'));
+      // Sent straight to the selected backend (Live, or Offline Sync IP:8008)
+      setResult(await entryApi.markEntry(eventId, { qrName: name }));
     } catch (error: any) {
       setResult({ value: false, offline: isOfflineError(error), message: error.message });
     } finally {

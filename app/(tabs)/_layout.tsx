@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ScanBarcode, ClipboardList, Keyboard, RefreshCw } from 'lucide-react-native';
+import { ScanBarcode, ClipboardList, Keyboard } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
@@ -47,15 +47,6 @@ export default function TabLayout() {
           title: 'Entries',
           tabBarIcon: ({ size, color }) => (
             <ClipboardList size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="sync"
-        options={{
-          title: 'Sync',
-          tabBarIcon: ({ size, color }) => (
-            <RefreshCw size={size} color={color} />
           ),
         }}
       />

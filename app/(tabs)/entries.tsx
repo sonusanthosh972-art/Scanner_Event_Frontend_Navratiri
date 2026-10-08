@@ -15,7 +15,7 @@ import { useAuthStore } from "@/store/authStore";
 import { LogOut, Calendar, Clock, QrCode, Ticket, Layers } from "lucide-react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { InOutEntry } from "@/lib/types";
-import { localApi } from "@/services/localApi";
+import { entryApi } from "@/services/entryApi";
 import { formatDate, formatTime } from "@/lib/date";
 import { useRouter } from "expo-router";
 
@@ -46,7 +46,7 @@ export default function EntriesTab() {
     else setLoading(true);
 
     try {
-      const data = await localApi.entries(String(user.eventId));
+      const data = await entryApi.entries();
       setEntries(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch entries:", error);
